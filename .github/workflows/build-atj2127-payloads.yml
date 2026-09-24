@@ -1,0 +1,30 @@
+name: Build ATJ2127 payloads
+on:
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: fedora:latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install MIPS cross compiler
+        run: dnf install -y gcc-mips64-linux-gnu make binutils file
+      - name: Build payloads
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p out
+          make -C payload clean
+          make -C payload NAME=adfus CC="mips64-linux-gnu-gcc -mabi=32 -EL" OBJCOPY=mips64-linux-gnu-objcopy
+          cp payload/adfus.bin out/adfus.bin
+          make -C payload clean
+          make -C payload NAME=nandread CC="mips64-linux-gnu-gcc -mabi=32 -EL" OBJCOPY=mips64-linux-gnu-objcopy
+          cp payload/nandread.bin out/nandread.bin
+          file out/adfus.bin out/nandread.bin
+          sha256sum out/adfus.bin out/nandread.bin | tee out/SHA256SUMS.txt
+      - name: Upload payloads
+        uses: actions/upload-artifact@v4
+        with:
+          name: atj2127-payloads
+          path: out/
+          if-no-files-found: error
